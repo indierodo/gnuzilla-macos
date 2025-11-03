@@ -26,7 +26,7 @@ jobs:
           mkdir -p src && cd src
           curl -LO "https://kojipkgs.fedoraproject.org//packages/icecat/140.4.0/1.rh1.fc43app1/src/icecat-140.4.0-1.rh1.fc43app1.src.rpm"
           rpm2cpio *.src.rpm | cpio -idmv
-          tar -xf icecat-*.tar.xz
+          tar -xf icecat-*.tar.*
           mv icecat-* icecat
 
       - name: Build Icecat
