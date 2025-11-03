@@ -1,0 +1,58 @@
+name: Build Icecat macOS
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          brew install python3 pkg-config gtk+3 dbus-glib nasm cbindgen coreutils \
+            yasm autoconf@2.13 llvm gobject-introspection libffi glib gdk-pixbuf \
+            cairo pango librsvg gnome-icon-theme adwaita-icon-theme wget unzip rpm2cpio cpio
+
+          python3 -m venv .venv
+          source .venv/bin/activate
+          pip install -U pip setuptools wheel jsonschema
+
+      - name: Fetch latest Fedora IceCat SRPM
+        run: |
+          set -e
+          mkdir -p src && cd src
+          curl -LO "https://kojipkgs.fedoraproject.org//packages/icecat/140.4.0/1.rh1.fc43app1/src/icecat-140.4.0-1.rh1.fc43app1.src.rpm"
+          rpm2cpio *.src.rpm | cpio -idmv
+          tar -xf icecat-*.tar.xz
+          mv icecat-* icecat
+
+      - name: Build Icecat
+        run: |
+          set -e
+          cd src/icecat
+
+          cp ../../mozconfig-apple-silicon .mozconfig
+
+          for patch in ../*.patch; do
+            [ -f "$patch" ] && patch -p1 < "$patch"
+          done
+
+          [ -f ../icecat.icns ] && \
+            cp ../icecat.icns browser/branding/official/icecat.icns
+
+          export SDKROOT=$(xcrun --show-sdk-path)
+          export MOZ_ENABLE_MACBUNDLE=1
+
+          source ../../.venv/bin/activate
+          ./mach configure
+          ./mach build
+          ./mach package
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: icecat-macos
+          path: src/icecat/obj-*/dist/install/sea/*.dmg
